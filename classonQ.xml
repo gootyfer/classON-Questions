@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Module>
+	<ModulePrefs title="classON Questions" height="610" width="960"
+	 description="Widget to share your questions in class"
+	 author="Israel Gutiérrez, UC3M, Spain" 
+	 author_email="igutierrez@inv.it.uc3m.es">
+	  <Require feature="opensocial-0.8"/>
+	  <Require feature="openapp" />
+	  <Require feature="dynamic-height"/>
+	  <OAuth>
+      <Service name="openapp" xmlns:openapp="http://www.role-project.eu/xml/openapp/opensocialext/"
+               openapp:service="http://purl.org/role/terms/spaceService"
+               openapp:permitReadAppend="http://purl.org/role/terms/data">
+	<Request method="" url=""/>
+	<Authorization url=""/>
+	<Access method="" url=""/>
+      </Service>
+    </OAuth>
+	</ModulePrefs>
+	<Content type="html"><![CDATA[
+	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.js"></script>
+      <script>
+  	<script src="http://open-app.googlecode.com/files/openapp.js"></script>
+  	<script src="http://role-project.svn.sourceforge.net/svnroot/role-project/trunk/libraries/iwc/src/main/javascript/iwc.js"></script>
+	<script type="application/javascript">
+		var iwcClient;
+		//TODO: Save info about MY +1s
+		//TODO: use associative arrays
+		var question_list = [];
+		
+		function init(){
+			iwcClient = new iwc.Client(["*"]);
+			iwcClient.connect(iwcCallback);
+		}
+		function iwcCallback(intent){
+			if(intent.action == "NEW_QUESTION" && intent.dataType == "text/plain" && intent.extras["question"] != null){
+				console.log("received new question event");
+				question_list.push({
+					question: extras["question"],
+					follows: 1
+				});
+			}
+			if(intent.action == "NEW_FOLLOW" && intent.dataType == "text/plain" && intent.extras["question_id"] != null){
+				console.log("received new follow event");
+				question_list[question_id].follows+=1;
+			}
+		}
+		function new_question(){
+			var question = document.getElementById("question").value;
+			var intent = {
+				"component":"",					
+				"action":"NEW_QUESTION",
+				"data":"http://class-on.org/question/",
+				"dataType":"text/plain",
+				"flags":["PUBLISH_GLOBAL"],
+				"extras":{"question":question}
+			};
+			sendIntent(intent);
+			//TODO: save question to the space
+			//TODO: clear input and show OK
+		}
+		function new_follow(question_id){
+			var intent = {
+				"component":"",					
+				"action":"NEW_FOLLOW",
+				"data":"http://class-on.org/follow/",
+				"dataType":"text/plain",
+				"flags":["PUBLISH_GLOBAL"],
+				"extras":{"question_id":question_id}
+			};
+			sendIntent(intent);
+			//TODO: save +1 to the space
+			//TODO: show OK
+		}
+		
+		function show_list(){
+			//TODO: make list visible
+			//TODO: print list with +1's and buttons
+		}
+
+		function show_main(){
+			//TODO: make main visible
+		}
+	</script>
+	<div id="main">
+		<input type="text" id="question" />
+		<input id="new_q" type="button" value="HELP" onclick="new_question()" />
+		<input id="list" type="button" value="LIST" onclick="show_list()" />
+	</div>
+	<div id="list">
+		<input id="list" type="button" value="BACK" onclick="show_main()" />
+	</div>
+	]]></Content>
+</Module>

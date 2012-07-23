@@ -46,6 +46,7 @@
 				margin-top: 15px;
 				margin-left: 15%;
 			}
+
 			#help:hover{
 				cursor:pointer;
 			}
@@ -72,26 +73,41 @@
 				cursor:pointer;
 			}
     		
+			#notif{
+				color: green;
+				font-size: 12pt;
+				text-align: center;
+				padding-top: 5px;
+			}
+
     		#questions ul{
 				list-style-type: none;
+				padding: 0;
+				margin: 0;
 			}
 
 			#questions ul li{
 				font-size: 9pt;
 				padding: 0px 0px 0px 5px;
+				min-height: 60px;
 			}
 
 			#questions ul li:nth-child(even){
 				background: lightgray;
 			}
-			
+
 			.hide{
 				display: none;
+			}
+
+			.questiontext{
+				width: 240px;
 			}
 
 			.follows{
 				color:grey;
 				margin-left: 15px;
+				width: 225px;
 			}
 
 			.plusone{
@@ -99,16 +115,24 @@
 				height:50px;
 				border-radius:25px;
 				float: right;
-				background-color: yellow;
+				background-color: grey;
 				font-size: 14pt;
-				top: -60px;
+				top: -50px;
 				right: 10px;
 				text-align: center;
 				line-height: 2.5em;
 				position: relative;
 			}
-			.plusone:hover{
+			.active{
+				background-color: yellow;
+			}
+			.active:hover{
 				cursor:pointer;
+			}
+
+			#qlist{
+				height: 340px;
+				overflow-y: scroll;
 			}
 
 			#back{
@@ -124,6 +148,7 @@
 			}
 			#back:hover{
 				cursor:pointer;
+				top: 
 			}
     	</style>
 
@@ -181,14 +206,14 @@
 			
 			//Show the questions screen
 			function show_questions(){
-				var sHTML = "<ul>";
+				var sHTML = "<div id='qlist'><ul>";
 				for(var i=0; i<questions.length;i++){
 					var voted = questions[i].votes.indexOf(userid)!=-1;
-					sHTML+="<li><p>"+questions[i].description+"</p><p class='follows'>"+questions[i].votes.length+
-						" students following this question</p><div class='plusone'"+
-						(voted?" style='background-color:grey;'":" onclick='vote("+i+")'")+">+1</div></li>";
+					sHTML+="<li><div><p class='questiontext'>"+questions[i].description+"</p><p class='follows'>"+questions[i].votes.length+
+						" students following this question</p></div><div class='plusone"+
+						(voted?"'":" active' onclick='vote("+i+")'")+">+1</div></li>";
 				}
-				sHTML += "</ul><br><div id='back' onclick='back()'>BACK</div>";
+				sHTML += "</ul></div><div id='back' onclick='back()'>BACK</div>";
 
 				var questions_div = document.getElementById("questions");
 				var main_div = document.getElementById("main");
@@ -207,6 +232,11 @@
 				questions_div.className="hide";
 				main_div.className = "";
 				main_page = true;
+			}
+
+			function showNotification(text){
+				document.getElementById("notif").innerHTML = text;
+				setTimeout(function(){document.getElementById("notif").innerHTML = "";}, 2000);
 			}
 
 			//Funtion executed when the user votes a question
@@ -239,7 +269,7 @@
 								arr[i].setRepresentation({
 									description : question.description,
 									votes: question.votes
-								}, "rdfjson",function(sub){
+								}, "application/json",function(sub){
 									console.log("UPDATED RESOURCE");
 									console.log(sub);
 									//Sent intent
@@ -269,11 +299,13 @@
 							votes:intent.extras.votes
 						});
 						console.log("received intent to create a new question: "+intent.extras.id);
+						showNotification("New question added");
 					}else if(intent.action == "ACTION_UPDATE"){ //New +1 to a question
 						for(var i=0;i<questions.length;i++){
 							if(questions[i].id == intent.extras.id){
 								questions[i].votes = intent.extras.votes;
 								console.log("received intent to update a question: "+intent.extras.id);
+								showNotification("Question updated");
 							}
 						}
 					}
@@ -374,6 +406,7 @@
 			<textarea id="description"></textarea><br>
 			<div id="help" onclick="storeQuestion()">HELP!</div>
 			<div onclick="show_questions()" id="check">Check my colleagues questions</div>
+			<div id="notif"></div>
 		</div>
 		<div id="questions" class="hide">
 		</div>

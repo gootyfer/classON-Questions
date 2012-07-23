@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Module>
+  <ModulePrefs title="classON questions"
+		description="Exchange questions and rate them!"
+		author="Israel Gutiérrez, UC3M, Spain"
+		author_email="igutierrez@inv.it.uc3m.es"
+		height="400">
+  	<Require feature="opensocial-0.8" />
+    <Require feature="openapp" />
+    <OAuth>
+		<Service name="openapp" xmlns:openapp="http://www.role-project.eu/xml/openapp/opensocialext/" 
+			openapp:service="http://purl.org/role/terms/spaceService"
+			openapp:permitReadAppend="http://purl.org/role/terms/data">
+			<Request method="" url=""/>
+			<Authorization url=""/>
+			<Access method="" url=""/>
+		</Service>
+    </OAuth>
+  </ModulePrefs>
+  <Content type="html">
+    <![CDATA[
+    	<!-- Style -->
+    	<style type="text/css">
+    		h3{
+    			color: blue;
+    			text-align: center;
+    		}
+
+    		p{
+    			font-family: Verdana;
+    		}
+
+    		#main p{
+    			text-align: center;
+    		}
+
+    		#help{
+				background-color: red;
+				color: white;
+				font-size: 14pt;
+				width:70%;
+				height:50px;
+				border-radius:10px;
+				text-align: center;
+				line-height: 2.5em;
+				margin-top: 15px;
+				margin-left: 15%;
+			}
+			#help:hover{
+				cursor:pointer;
+			}
+
+			textarea{
+				width: 80%;
+				border-radius: 10px;
+				height: 75px;
+				margin-left: 10%;
+			}
+
+			#check{
+				background-color: grey;
+				font-size: 12pt;
+				width:90%;
+				height:50px;
+				border-radius:10px;
+				text-align: center;
+				line-height: 2.5em;
+				margin-top: 15px;
+				margin-left: 5%;
+			}
+			#check:hover{
+				cursor:pointer;
+			}
+    		
+    		#questions ul{
+				list-style-type: none;
+			}
+
+			#questions ul li{
+				font-size: 9pt;
+				padding: 0px 0px 0px 5px;
+			}
+
+			#questions ul li:nth-child(even){
+				background: lightgray;
+			}
+			
+			.hide{
+				display: none;
+			}
+
+			.follows{
+				color:grey;
+				margin-left: 15px;
+			}
+
+			.plusone{
+				width:50px;
+				height:50px;
+				border-radius:25px;
+				float: right;
+				background-color: yellow;
+				font-size: 14pt;
+				top: -60px;
+				right: 10px;
+				text-align: center;
+				line-height: 2.5em;
+				position: relative;
+			}
+			.plusone:hover{
+				cursor:pointer;
+			}
+
+			#back{
+				background-color: blue;
+				color: white;
+				font-size: 14pt;
+				width:90%;
+				margin-left: 5%;
+				height:50px;
+				border-radius:10px;
+				text-align: center;
+				line-height: 2.5em;
+			}
+			#back:hover{
+				cursor:pointer;
+			}
+    	</style>
+
+		<!-- Scripts -->
+    	<script type="text/javascript" src="http://dbis.rwth-aachen.de/gadgets/iwc/lib/iwc.js"></script>
+		<script>
+			//Space data
+			var space;
+
+			//User data
+			var user;
+			var userid;
+
+			//IWC client
+			var iwcClient;
+
+			//Get space data async
+			openapp.resource.get(openapp.param.space(), function(s){
+				space = s;
+				//Overwrite!
+				space = new openapp.oo.Resource(openapp.param.space());
+				console.log("SPACE:");
+				console.log(space);
+
+				//Get user data async
+				openapp.resource.get(openapp.param.user(), function(u){
+					user = u;
+					//Overwrite!
+					user = new openapp.oo.Resource(openapp.param.user());
+					userid = user.uri;
+					console.log("USER:");
+					console.log(user);
+
+					//Get user name
+					user.getInfo(function(info){
+						username = info[openapp.ns.dcterms+"title"];
+						document.getElementById("uname").innerHTML = username;
+					});
+
+					//Inter widget communication client init
+					iwcClient = new iwc.Client();
+					iwcClient.connect(iwcCallback);
+
+					//Load info from space
+					loadQuestions();
+				});
+			});
+
+			//Local cache of questions
+			//format: {id:resource_uri, description: desc, votes: [userid1, userid2]}
+			var questions = [];
+
+			//Control the page
+			var main_page = true;
+			
+			//Show the questions screen
+			function show_questions(){
+				var sHTML = "<ul>";
+				for(var i=0; i<questions.length;i++){
+					var voted = questions[i].votes.indexOf(userid)!=-1;
+					sHTML+="<li><p>"+questions[i].description+"</p><p class='follows'>"+questions[i].votes.length+
+						" students following this question</p><div class='plusone'"+
+						(voted?" style='background-color:grey;'":" onclick='vote("+i+")'")+">+1</div></li>";
+				}
+				sHTML += "</ul><br><div id='back' onclick='back()'>BACK</div>";
+
+				var questions_div = document.getElementById("questions");
+				var main_div = document.getElementById("main");
+				questions_div.innerHTML = sHTML;
+				questions_div.className="";
+				main_div.className = "hide";
+				main_page = false;
+				console.log("QUESTIONS");
+				console.log(questions);
+			}
+
+			//Back to the main screen
+			function back(){
+				var questions_div = document.getElementById("questions");
+				var main_div = document.getElementById("main");
+				questions_div.className="hide";
+				main_div.className = "";
+				main_page = true;
+			}
+
+			//Funtion executed when the user votes a question
+			//Save new data to the space and send an update intent
+			function vote(qid){
+				//Check that the question exists
+				if(!questions[qid]) return;
+
+				//NOT update local data: do it when the intent comes
+				//Clone question data to a temporal variable (there's no clone method!)
+				var question = {
+					id: questions[qid].id, 
+					description: questions[qid].description, 
+					votes: questions[qid].votes
+				};
+
+				if(question.votes.indexOf(userid)==-1){
+					question.votes.push(userid);
+				}
+				
+				//Update data in the space
+				space.getSubResources({
+					relation: openapp.ns.role+"data",
+					type: "classon:question",
+					onAll: function(arr){
+						var found = false;
+						for(var i=0; i<arr.length; i++){
+							if(arr[i].uri == question.id){
+								//Set representation IS NOT WORKING!!!!!
+								arr[i].setRepresentation({
+									description : question.description,
+									votes: question.votes
+								}, "rdfjson",function(sub){
+									console.log("UPDATED RESOURCE");
+									console.log(sub);
+									//Sent intent
+									publishResourceUpdate(question, "ACTION_UPDATE");
+									//Update UI
+									//show_questions();
+								});
+								console.log("Resource Found! uri:"+question.id);
+								found = true;
+								break;
+							}
+						}
+						if(!found){
+							console.log("Resource NOT Found! uri:"+question.id);	
+						}
+					}
+				});
+			}
+
+			//Function executed when a intent is received from IWC
+			function iwcCallback(intent){
+				if(intent.extras.ns == "classon:question"){
+					if(intent.action == "ACTION_NEW"){ //New question
+						questions.push({
+							id:intent.extras.id,
+							description:intent.data,
+							votes:intent.extras.votes
+						});
+						console.log("received intent to create a new question: "+intent.extras.id);
+					}else if(intent.action == "ACTION_UPDATE"){ //New +1 to a question
+						for(var i=0;i<questions.length;i++){
+							if(questions[i].id == intent.extras.id){
+								questions[i].votes = intent.extras.votes;
+								console.log("received intent to update a question: "+intent.extras.id);
+							}
+						}
+					}
+					if(!main_page){
+						//Update UI
+						show_questions();
+					}
+				}
+			}
+
+			//Publish an intent (via IWC) with some data and executing an action
+			function publishResourceUpdate(data, action){
+				//Check iwcClient
+				if(!iwcClient) return;
+				var intent = {
+					"component":"",
+					"data":data.description,
+					"dataType":"text/json",
+					"action":action,
+					"flags":["PUBLISH_GLOBAL"],
+					"extras":{"ns":"classon:question", "votes":data.votes, "id":data.id}
+				};
+				iwcClient.publish(intent);
+				//console.log("intent published!");
+			}
+
+			//NOT USED: Register handler for widget load event
+			gadgets.util.registerOnLoadHandler(function(){
+				//console.log("Widget loaded");
+				loadQuestions();
+			});
+
+			//Load all the questions from the space
+			function loadQuestions(){
+				//Check space existence
+				if(!space) return;
+
+				//Delete previuos questions
+				questions = [];
+
+				//Get questions from space
+				space.getSubResources({
+					relation: openapp.ns.role+"data",
+					type: "classon:question",
+					onEach: function(question){
+						console.log("QUESTION SPACE");
+						console.log(question);
+						question.getRepresentation("rdfjson",function(q){
+							//Use the URI as the question id
+							q.id = question.uri;
+							questions.push(q);
+						});
+					}
+				});
+			}
+
+			//Store the question in the space, and broadcast an intent about it
+			function storeQuestion(){
+				var description = document.getElementById("description").value;
+
+				//Check some text introduced by the user
+				if(!description) return;
+
+				//Remove question text in the textarea
+				document.getElementById("description").value = "";
+
+				//Define question data to be saved
+				var question = {
+					"description": description,
+					"votes": [userid] //The creator of a question +1 it by default
+				};
+
+				space.create({
+					relation: openapp.ns.role+"data",
+					type: "classon:question",
+					representation: question,
+					callback: function(sub){
+						//Update 
+						question.id = sub.uri;
+
+						//NOT update local data: wait for the incoming intent
+						//questions.push(question);
+
+						//Broadcast intent
+						publishResourceUpdate(question, "ACTION_NEW");
+					}
+				});
+			}
+			
+		</script>
+		
+		<!-- UI -->
+		<div id="main">
+			<h3>ClassON Questions</h3>
+			<p>Hello, <span id="uname"></span></p>
+			<p>Welcome to <a href="http://www.class-on.org" target="_blank">classON</a>!</p>
+			
+			<textarea id="description"></textarea><br>
+			<div id="help" onclick="storeQuestion()">HELP!</div>
+			<div onclick="show_questions()" id="check">Check my colleagues questions</div>
+		</div>
+		<div id="questions" class="hide">
+		</div>
+	]]>
+  </Content>
+</Module>
